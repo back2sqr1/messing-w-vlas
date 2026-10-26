@@ -52,3 +52,11 @@ def test_plan_matches_brute_force_on_random_boards():
     for _ in range(100):
         game = Game(bad=int(rng.choice([RED, BLUE])), seed=int(rng.integers(2**31)))
         assert plan(game.blocks, game.robot, game.bad) == brute_force(game.blocks, game.robot, game.bad)
+
+
+def test_expert_never_crashes():
+    for seed in range(100):
+        game = Game(bad=(RED, BLUE)[seed % 2], seed=seed)
+        while not game.over:
+            game.step(expert_move(game.blocks, game.robot, game.bad))
+        assert not game.crashed, f"seed {seed}"
