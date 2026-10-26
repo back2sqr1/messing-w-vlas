@@ -1,9 +1,10 @@
 import numpy as np
+import torch
 
 from dodge.expert import expert_move
 from dodge.game import TEMPLATES, instruction
-from dodge.train import collect
-from dodge.vla import VOCAB
+from dodge.train import accuracy, collect, train
+from dodge.vla import VOCAB, TinyVLA
 
 
 def test_collect_labels_every_frame_once_per_task():
@@ -21,3 +22,11 @@ def test_each_label_comes_with_an_instruction_for_its_task():
     for ids, bad in zip(words, bads):
         text = " ".join(VOCAB[i] for i in ids if i)
         assert text in [instruction(bad, t) for t in range(len(TEMPLATES))]
+
+
+def test_training_fits_a_small_dataset():
+    torch.manual_seed(0)
+    data = collect(episodes=3, seed=0)  # 1200 frames; always answering STAY scores 0.63
+    model = TinyVLA()
+    train(model, data, epochs=10, seed=0, batch=64)
+    assert accuracy(model, data) > 0.85
