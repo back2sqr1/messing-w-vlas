@@ -22,3 +22,46 @@ def other(color):
 
 def instruction(bad, template=0):
     return TEMPLATES[template].format(bad=NAMES[bad], good=NAMES[other(bad)])
+
+
+class Game:
+    def __init__(self, bad, seed=None):
+        self.bad = bad
+        self.rng = np.random.default_rng(seed)
+        self.blocks = np.zeros((ROWS - 1, COLS), np.int8)  # the last row lands on the robot row next step
+        for _ in range(ROWS - 1):  # start with a full board, not an empty one
+            self.fall()
+        self.robot = int(self.rng.integers(COLS))
+        self.steps = 0
+        self.caught = 0
+        self.crashed = False
+
+    @property
+    def over(self):
+        return self.crashed or self.steps >= MAX_STEPS
+
+    def fall(self):
+        # At most one block of each color per row. The robot can always reach at least two cells
+        # next step and at most one of them holds a bad block, so a safe move always exists.
+        row = np.zeros(COLS, np.int8)
+        red_col, blue_col = self.rng.permutation(COLS)[:2]
+        if self.rng.random() < SPAWN_P:
+            row[red_col] = RED
+        if self.rng.random() < SPAWN_P:
+            row[blue_col] = BLUE
+        self.blocks = np.vstack([row, self.blocks[:-1]])
+
+    def grid(self):
+        g = np.zeros((ROWS, COLS), np.int8)
+        g[:-1] = self.blocks
+        g[-1, self.robot] = ROBOT
+        return g
+
+    def step(self, move):
+        """Move the robot, then every block falls one row."""
+        self.robot = min(max(self.robot + move - 1, 0), COLS - 1)
+        landed = self.blocks[-1, self.robot]
+        self.caught += int(landed == other(self.bad))
+        self.crashed = bool(landed == self.bad)
+        self.fall()
+        self.steps += 1
