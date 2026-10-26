@@ -65,3 +65,36 @@ class Game:
         self.crashed = bool(landed == self.bad)
         self.fall()
         self.steps += 1
+
+
+PALETTE = {
+    ".": (20, 20, 30),  # background
+    "r": (230, 60, 60),
+    "b": (60, 120, 240),
+    "w": (225, 225, 225),  # robot body
+    "y": (255, 200, 0),  # robot light
+    "k": (70, 70, 80),  # robot eyes and wheels
+}
+BLOCK = ["........"] + [".######."] * 6 + ["........"]
+ART = [
+    ["........"] * 8,  # EMPTY
+    [line.replace("#", "r") for line in BLOCK],  # RED
+    [line.replace("#", "b") for line in BLOCK],  # BLUE
+    [  # ROBOT
+        "...yy...",
+        "..wwww..",
+        ".wkwwkw.",
+        ".wwwwww.",
+        ".wwwwww.",
+        "..w..w..",
+        ".kk..kk.",
+        ".kk..kk.",
+    ],
+]
+SPRITES = np.array([[[PALETTE[c] for c in line] for line in art] for art in ART], np.uint8)
+
+
+def render(grids):
+    """Cell grids (..., ROWS, COLS) -> RGB frames (..., ROWS*CELL, COLS*CELL, 3), uint8."""
+    tiles = np.swapaxes(SPRITES[grids], -4, -3)  # (..., ROWS, CELL, COLS, CELL, 3)
+    return tiles.reshape(*grids.shape[:-2], ROWS * CELL, COLS * CELL, 3)

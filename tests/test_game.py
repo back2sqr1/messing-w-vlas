@@ -1,4 +1,7 @@
-from dodge.game import BLUE, EMPTY, LEFT, MAX_STEPS, RED, RIGHT, STAY, Game, instruction
+import numpy as np
+
+from dodge.game import (BLUE, CELL, COLS, EMPTY, LEFT, MAX_STEPS, RED, RIGHT, ROBOT, ROWS, SPRITES, STAY, Game,
+                        instruction, render)
 
 
 def test_instruction_names_the_bad_color():
@@ -67,3 +70,21 @@ def test_new_rows_hold_at_most_one_block_of_each_color():
         assert (game.blocks[0] == RED).sum() <= 1 and (game.blocks[0] == BLUE).sum() <= 1
         reds += (game.blocks[0] == RED).sum()
     assert 0.4 < reds / 2000 < 0.6  # SPAWN_P = 0.5
+
+
+def test_render_draws_each_cell_as_its_sprite():
+    grid = np.zeros((ROWS, COLS), np.int8)
+    grid[0, 0], grid[2, 5], grid[-1, 4] = RED, BLUE, ROBOT
+    frame = render(grid)
+    assert frame.shape == (ROWS * CELL, COLS * CELL, 3) and frame.dtype == np.uint8
+    assert (frame[:CELL, :CELL] == SPRITES[RED]).all()
+    assert (frame[2 * CELL:3 * CELL, 5 * CELL:6 * CELL] == SPRITES[BLUE]).all()
+    assert (frame[-CELL:, 4 * CELL:5 * CELL] == SPRITES[ROBOT]).all()
+    assert (frame[CELL:2 * CELL, :CELL] == SPRITES[EMPTY]).all()
+
+
+def test_render_handles_a_batch_of_grids():
+    grids = np.stack([Game(RED, seed=s).grid() for s in range(5)])
+    frames = render(grids)
+    assert frames.shape == (5, ROWS * CELL, COLS * CELL, 3)
+    assert all((frames[i] == render(grids[i])).all() for i in range(5))
