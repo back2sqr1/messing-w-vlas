@@ -24,3 +24,26 @@ def draw(screen, font, game, text):
         status += "   CRASH"
     screen.blit(font.render(f'told: "{text}"', True, (255, 255, 255)), (10, 6))
     screen.blit(font.render(status, True, (170, 170, 170)), (10, 26))
+
+
+def record(path, policy, game, text, fps):
+    """Play one episode into an MP4 through the system ffmpeg. No window opens."""
+    pygame.font.init()
+    font = pygame.font.Font(None, 24)
+    screen = pygame.Surface(SIZE)
+    ffmpeg = subprocess.Popen(
+        ["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+         "-s", f"{SIZE[0]}x{SIZE[1]}", "-r", str(fps), "-i", "-", "-pix_fmt", "yuv420p", str(path)],
+        stdin=subprocess.PIPE,
+    )
+    while True:
+        draw(screen, font, game, text)
+        frame = pygame.image.tobytes(screen, "RGB")
+        ffmpeg.stdin.write(frame)
+        if game.over:
+            break
+        game.step(policy(game, text))
+    ffmpeg.stdin.write(frame * fps)  # hold the last frame for one second
+    ffmpeg.stdin.close()
+    if ffmpeg.wait() != 0:
+        raise RuntimeError("ffmpeg failed")
