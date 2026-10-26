@@ -47,3 +47,63 @@ def record(path, policy, game, text, fps):
     ffmpeg.stdin.close()
     if ffmpeg.wait() != 0:
         raise RuntimeError("ffmpeg failed")
+
+
+def live(policy, game, text, fps, swap, rng):
+    """Window mode. Space flips which color is bad (rule and instruction together). Esc quits."""
+    pygame.init()
+    screen = pygame.display.set_mode(SIZE)
+    pygame.display.set_caption("dodge VLA   space: flip colors   esc: quit")
+    font = pygame.font.Font(None, 24)
+    clock = pygame.time.Clock()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                pygame.quit()
+                return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                game.bad = other(game.bad)
+                text = told(game, swap, rng)
+        draw(screen, font, game, text)
+        pygame.display.flip()
+        clock.tick(fps)
+        if game.over:
+            pygame.time.wait(1500)
+            game = Game(game.bad, seed=int(rng.integers(2**31)))
+            text = told(game, swap, rng)
+        else:
+            game.step(policy(game, text))
+
+
+def main():
+    p = argparse.ArgumentParser(description="Watch a policy play, or record one episode to MP4.")
+    p.add_argument("--policy", choices=["vla", "expert", "random"], default="vla")
+    p.add_argument("--model", default="out/vla.pt")
+    p.add_argument("--bad", choices=["red", "blue"], help="color that crashes the robot (default: random)")
+    p.add_argument("--swap", action="store_true", help="tell the policy the opposite color")
+    p.add_argument("--seed", type=int, help="default: random")
+    p.add_argument("--fps", type=int, default=6)
+    p.add_argument("--record", metavar="MP4", help="write one episode to this file instead of opening a window")
+    args = p.parse_args()
+    seed = args.seed if args.seed is not None else int(np.random.default_rng().integers(2**31))
+    rng = np.random.default_rng(seed)
+    bad = {"red": RED, "blue": BLUE}[args.bad] if args.bad else int(rng.choice([RED, BLUE]))
+    game = Game(bad, seed=int(rng.integers(2**31)))
+    text = told(game, args.swap, rng)
+    if args.policy == "vla":
+        policy = vla_policy(load_vla(args.model))
+    elif args.policy == "expert":
+        policy = expert_policy
+    else:
+        policy = random_policy(seed)
+    print(f"seed {seed}")
+    if args.record:
+        record(args.record, policy, game, text, args.fps)
+        result = "crashed" if game.crashed else "survived"
+        print(f"wrote {args.record}: {result} after {game.steps} steps, caught {game.caught}")
+    else:
+        live(policy, game, text, args.fps, args.swap, rng)
+
+
+if __name__ == "__main__":
+    main()
