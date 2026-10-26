@@ -66,3 +66,28 @@ def train(model, data, epochs, seed, batch=256, lr=1e-3, val=None):
         if val is not None:
             line += f"  val accuracy {accuracy(model, val):.3f}"
         print(line, flush=True)
+
+
+def main():
+    p = argparse.ArgumentParser(description="Play expert games, then train the VLA to copy the expert's moves.")
+    p.add_argument("--episodes", type=int, default=300)
+    p.add_argument("--epochs", type=int, default=8)
+    p.add_argument("--seed", type=int, help="default: random")
+    p.add_argument("--out", default="out/vla.pt")
+    args = p.parse_args()
+    seed = args.seed if args.seed is not None else int(np.random.default_rng().integers(2**31))
+    torch.manual_seed(seed)
+    print(f"seed {seed}  device {DEVICE}", flush=True)
+    start = time.time()
+    data = collect(args.episodes, seed)
+    val = collect(max(args.episodes // 10, 1), seed + 1)
+    print(f"{len(data[2])} training frames, {len(val[2])} validation frames ({time.time() - start:.0f}s)", flush=True)
+    model = TinyVLA().to(DEVICE)
+    train(model, data, args.epochs, seed, val=val)
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    torch.save(model.state_dict(), args.out)
+    print(f"saved {args.out}  ({time.time() - start:.0f}s total)")
+
+
+if __name__ == "__main__":
+    main()
